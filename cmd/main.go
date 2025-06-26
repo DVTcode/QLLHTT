@@ -14,8 +14,8 @@ func main() {
 	config.LoadEnv()
 	config.ConnectDB()
 
-	r := gin.Default()
-	routes.RegisterRoutes(r)
+	r := gin.Default()       //khởi tạo một router mặc định,
+	routes.RegisterRoutes(r) //gọi hàm RegisterRoutes trong package routes và truyền router r vào để đăng ký toàn bộ các route (đường dẫn API) của ứng dụng web.
 
 	port := ":" + os.Getenv("PORT")
 	if port == ":" {

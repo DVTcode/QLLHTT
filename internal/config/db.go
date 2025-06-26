@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/joho/godotenv"
+	"github.com/joho/godotenv" //Dùng để tải file .env vào biến môi trường trong Go.
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
@@ -15,14 +15,14 @@ import (
 var DB *gorm.DB
 
 func LoadEnv() {
-	err := godotenv.Load()
+	err := godotenv.Load() //Load để đọc file .env, không truyền vào gì thì nó tự động mặc định kiếm .env để gán vào biến môi trường và nếu file .env bị lỗi thì trả về false nghĩa là ko phải nil
 	if err != nil {
-		log.Fatal("❌ Load .env failed")
+		log.Fatal("❌ Load .env failed") //Dùng để ghi log dạng lỗi nghiêm trọng rồi thoát khỏi chương trình ngay lập tức (giống như panic()).
 	}
 }
 
 func ConnectDB() {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True", // sau khi format root:123456@tcp(localhost:3306)/qllhtt?charset=utf8mb4&parseTime=True
 		os.Getenv("DB_USER"),
 		os.Getenv("DB_PASS"),
 		os.Getenv("DB_HOST"),
@@ -31,7 +31,7 @@ func ConnectDB() {
 	)
 
 	var err error
-	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{}) //mở kết nối đến DB qua driver mysql.
 	if err != nil {
 		log.Fatal("❌ Failed to connect DB:", err)
 	}
@@ -42,6 +42,7 @@ func ConnectDB() {
 		&models.Course{},
 		&models.Document{},
 		&models.Enrollment{},
+		&models.RefreshToken{},
 	)
 	if err != nil {
 		log.Fatal("❌ Auto migration failed:", err)

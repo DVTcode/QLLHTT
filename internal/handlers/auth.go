@@ -12,10 +12,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // ✅ JWT Claims
+// Xác định thông tin người dùng sẽ được nhúng vào token JWT.
 type Claims struct {
 	UserID uint   `json:"user_id"`
 	Role   string `json:"role"`
@@ -104,8 +106,15 @@ func Login(c *gin.Context) {
 	}
 
 	token := generateToken(user.ID, user.Role)
+	refreshToken, err := generateRefreshToken(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate refresh token"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"token": token,
+		"access_token":  token,
+		"refresh_token": refreshToken,
 		"user": gin.H{
 			"id":       user.ID,
 			"username": user.Username,
@@ -133,6 +142,24 @@ func generateToken(userID uint, role string) string {
 		return ""
 	}
 	return signedToken
+}
+
+// ✅ Sinh refresh token
+func generateRefreshToken(userID uint) (string, error) {
+	token := uuid.New().String()
+	expiration := time.Now().Add(7 * 24 * time.Hour)
+
+	rt := models.RefreshToken{
+		UserID:    userID,
+		Token:     token,
+		ExpiresAt: expiration,
+	}
+
+	if err := config.DB.Create(&rt).Error; err != nil {
+		return "", err
+	}
+
+	return token, nil
 }
 
 // ✅ Middleware kiểm tra token + role
@@ -165,4 +192,37 @@ func AuthMiddleware(role string) gin.HandlerFunc {
 		c.Set("role", claims.Role)
 		c.Next()
 	}
+}
+
+// ✅ Refresh token handler
+func RefreshToken(c *gin.Context) {
+	var input struct {
+		RefreshToken string `json:"refresh_token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var rt models.RefreshToken
+	if err := config.DB.Where("token = ?", input.RefreshToken).First(&rt).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
+		return
+	}
+
+	if rt.ExpiresAt.Before(time.Now()) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Refresh token expired"})
+		return
+	}
+
+	var user models.User
+	if err := config.DB.First(&user, rt.UserID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "User not found"})
+		return
+	}
+
+	newToken := generateToken(user.ID, user.Role)
+	c.JSON(http.StatusOK, gin.H{
+		"access_token": newToken,
+	})
 }
